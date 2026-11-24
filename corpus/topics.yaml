@@ -1,0 +1,205 @@
+# Sujets des 50 runbooks synthétiques de la Banque Horizon (banque fictive).
+# scripts/generate_runbooks.py rédige un runbook par sujet dans corpus/runbooks/.
+# Les "faits" de chaque sujet (codes, seuils, commandes) sont imposés au générateur :
+# les questions du golden set (labs/lab01/questions.yaml) s'appuient dessus.
+runbooks:
+  - id: RB-001
+    title: Pod en CrashLoopBackOff sur le cluster k8s-prod-par1
+    service: plateforme-kubernetes
+    facts: "kubectl describe pod puis kubectl logs --previous ; vérifier OOMKilled (exit code 137) ; au-delà de 5 redémarrages en 10 min, ouvrir un incident P2 ; namespace par défaut des applis : apps-<appli>"
+  - id: RB-002
+    title: Nœud Kubernetes en NotReady
+    service: plateforme-kubernetes
+    facts: "vérifier kubelet (systemctl status kubelet), pression disque (DiskPressure au-delà de 85 %) ; cordon puis drain avec --ignore-daemonsets ; escalade à l'équipe Infra-Compute si plus d'un nœud"
+  - id: RB-003
+    title: Certificat TLS expiré sur la passerelle d'API
+    service: api-gateway
+    facts: "erreur client HZ-TLS-021 ; certificats émis par la PKI Vault rôle hz-server ; renouvellement : vault write pki/issue/hz-server ; alerte à J-15 avant expiration"
+  - id: RB-004
+    title: Latence élevée sur le service de paiements
+    service: svc-paiements
+    facts: "SLO : p95 < 300 ms ; au-delà de 800 ms pendant 5 min, incident P1 ; vérifier le pool de connexions PostgreSQL (max 50) et la file Kafka paiements.out"
+  - id: RB-005
+    title: Virements SEPA bloqués en statut PENDING
+    service: svc-sepa
+    facts: "code HZ-SEPA-404 côté partenaire ; relancer le batch sepa-dispatch (job Argo sepa-dispatch-retry) ; cut-off STEP2 à 15h30 ; au-delà de 1 000 virements en attente, P1 et prévenir le back-office"
+  - id: RB-006
+    title: Taux de refus anormal des autorisations carte
+    service: svc-cartes
+    facts: "seuil d'alerte : taux de refus > 8 % sur 15 min ; code réseau 91 (émetteur indisponible) ; vérifier le lien HSM (hsm-par1) ; basculer sur hsm-par2 via la procédure HSM-FAILOVER"
+  - id: RB-007
+    title: Échec d'authentification massif sur le portail client
+    service: svc-auth
+    facts: "erreur HZ-AUTH-401 en masse ; vérifier le fournisseur OIDC (Keycloak realm horizon-clients) et la rotation des clés JWKS ; au-delà de 20 % d'échecs, P1"
+  - id: RB-008
+    title: Lag consommateur Kafka sur le topic paiements.out
+    service: kafka
+    facts: "seuil : lag > 50 000 messages ; commande kafka-consumer-groups --describe --group paiements-ledger ; augmenter les réplicas du consommateur jusqu'au nombre de partitions (12)"
+  - id: RB-009
+    title: Broker Kafka hors ligne
+    service: kafka
+    facts: "vérifier les partitions sous-répliquées (UnderReplicatedPartitions > 0) ; min.insync.replicas = 2 ; redémarrer un seul broker à la fois ; ne jamais supprimer le volume de données"
+  - id: RB-010
+    title: Réplication PostgreSQL en retard
+    service: postgresql
+    facts: "seuil : replication lag > 30 s ; requête pg_stat_replication ; cluster CloudNativePG pg-core ; si > 5 min, interdire la bascule et prévenir le DBA d'astreinte"
+  - id: RB-011
+    title: Bascule (failover) du cluster PostgreSQL pg-core
+    service: postgresql
+    facts: "commande kubectl cnpg promote pg-core <instance> ; vérifier le lag avant ; RPO cible 0, RTO cible 5 min ; changement d'urgence CHG obligatoire"
+  - id: RB-012
+    title: Saturation du disque d'une base PostgreSQL
+    service: postgresql
+    facts: "alerte à 80 %, critique à 90 % ; agrandir le PVC (storageClass longhorn-retain, expansion autorisée) ; purger les WAL archivés seulement après sauvegarde vérifiée"
+  - id: RB-013
+    title: Vault scellé (sealed) après redémarrage
+    service: vault
+    facts: "symptôme : erreur 503 Vault is sealed ; descellement avec 3 clés sur 5 (Shamir) détenues par les gardiens ; procédure VAULT-UNSEAL ; jamais de clé dans un ticket"
+  - id: RB-014
+    title: Secrets non synchronisés par Vault Secrets Operator
+    service: vault
+    facts: "vérifier l'état de la ressource VaultStaticSecret ; erreur 403 = rôle JWT ou policy ; forcer la resynchro en annotant la ressource ; refreshAfter par défaut 30 s"
+  - id: RB-015
+    title: Expiration des identifiants dynamiques de base de données
+    service: vault
+    facts: "TTL par défaut 1 h, max 24 h ; erreur applicative HZ-DB-028 (password authentication failed) ; vérifier le renouvellement du lease ; vault lease lookup"
+  - id: RB-016
+    title: Erreurs 502 sur la passerelle Traefik
+    service: api-gateway
+    facts: "vérifier les endpoints du service cible ; HTTPRoute mal référencée ; logs d'accès Traefik ; au-delà de 2 % d'erreurs 5xx sur 5 min, P2"
+  - id: RB-017
+    title: Résolution DNS interne en échec
+    service: reseau
+    facts: "zone interne horizon.local servie par CoreDNS puis les serveurs DNS internes 10.20.0.53 et 10.20.0.54 ; tester avec nslookup depuis un pod ; politique de forward séquentielle"
+  - id: RB-018
+    title: Déploiement GitOps bloqué (Flux)
+    service: plateforme-gitops
+    facts: "flux get kustomizations ; dépendance non prête = cause la plus fréquente ; flux reconcile kustomization <nom> --with-source ; ne jamais modifier à la main une ressource gérée par Flux"
+  - id: RB-019
+    title: Retour arrière (rollback) d'une application déployée par GitOps
+    service: plateforme-gitops
+    facts: "revert du commit dans le dépôt GitOps, pas de kubectl rollout undo ; délai cible < 10 min ; prévenir le responsable du changement ; tracer dans le ticket CHG"
+  - id: RB-020
+    title: Image de conteneur refusée par la politique Kyverno
+    service: plateforme-securite
+    facts: "règle require-signed-images : image non signée cosign ou hors registry interne registry.horizon.local ; pas d'exception sans dérogation sécurité DSEC"
+  - id: RB-021
+    title: Quota de ressources atteint dans un namespace
+    service: plateforme-kubernetes
+    facts: "erreur exceeded quota ; ResourceQuota par workspace ; une demande d'augmentation passe par un ticket au propriétaire du workspace ; pas de suppression de quota"
+  - id: RB-022
+    title: Volume persistant Longhorn dégradé
+    service: stockage
+    facts: "état Degraded = une réplique sur trois indisponible ; ne pas détacher le volume ; reconstruction automatique ; si deux répliques perdues, P1 et équipe Stockage"
+  - id: RB-023
+    title: Sauvegarde nocturne en échec
+    service: stockage
+    facts: "job Velero backup-nightly à 01h00 ; vérifier le stockage objet MinIO (bucket hz-backups) ; deux échecs consécutifs = incident P2 ; test de restauration mensuel"
+  - id: RB-024
+    title: Restauration d'un namespace depuis une sauvegarde
+    service: stockage
+    facts: "velero restore create --from-backup <nom> --include-namespaces <ns> ; restaurer d'abord dans un namespace de test ; validation métier avant bascule"
+  - id: RB-025
+    title: Fuite mémoire sur le service de comptes clients
+    service: svc-comptes
+    facts: "consommation mémoire qui croît de façon linéaire ; heap dump avant redémarrage (jcmd GC.heap_dump) ; limite mémoire du pod 2 Gi ; redémarrage progressif un pod à la fois"
+  - id: RB-026
+    title: Batch de clôture comptable en retard
+    service: svc-core-banking
+    facts: "batch EOD (fin de journée) démarre à 22h00, doit finir avant 05h00 ; code HZ-EOD-512 = verrou de table ; ne jamais relancer le batch sans accord du responsable comptable"
+  - id: RB-027
+    title: Rapprochement bancaire en écart
+    service: svc-core-banking
+    facts: "écart détecté par le job recon-daily ; seuil de tolérance 0,01 EUR ; au-delà, ticket au back-office et gel des écritures manuelles"
+  - id: RB-028
+    title: Service de notification SMS en panne
+    service: svc-notifications
+    facts: "fournisseur SMS externe ; code HZ-NOTIF-503 ; basculer sur le fournisseur secondaire via le feature flag notif.sms.provider=secondary ; les codes OTP sont prioritaires"
+  - id: RB-029
+    title: Envoi d'OTP (double authentification) retardé
+    service: svc-auth
+    facts: "délai cible < 10 s ; file Kafka otp.requests ; au-delà de 60 s, P1 car bloque les paiements ; vérifier aussi RB SMS"
+  - id: RB-030
+    title: Pic de trafic et autoscaling insuffisant
+    service: plateforme-kubernetes
+    facts: "HPA plafonné à maxReplicas ; vérifier le metrics-server ; augmenter maxReplicas par commit GitOps ; capacité des nœuds à vérifier avant (marge 20 %)"
+  - id: RB-031
+    title: Erreurs de connexion à l'API du partenaire de paiement instantané
+    service: svc-paiements
+    facts: "paiements instantanés SCT Inst, délai max 10 s de bout en bout ; code HZ-INST-408 (timeout) ; circuit breaker ouvert au-delà de 50 % d'erreurs sur 1 min"
+  - id: RB-032
+    title: Fraude suspectée détectée par le moteur de scoring
+    service: svc-fraude
+    facts: "score > 0,85 = blocage automatique ; ne jamais débloquer sans validation de l'équipe Fraude ; conserver les preuves ; ticket SEC confidentiel"
+  - id: RB-033
+    title: Moteur de scoring anti-fraude indisponible
+    service: svc-fraude
+    facts: "mode dégradé : règles statiques uniquement (fraude.mode=static) ; plafond de paiement abaissé à 500 EUR ; P1 immédiat"
+  - id: RB-034
+    title: Expiration d'un jeton d'API partenaire
+    service: api-gateway
+    facts: "jetons OAuth client_credentials, durée 1 h ; erreur HZ-API-498 ; renouvellement automatique par l'API Management ; vérifier l'horloge du serveur (dérive NTP)"
+  - id: RB-035
+    title: Dérive d'horloge NTP sur des serveurs
+    service: reseau
+    facts: "tolérance 500 ms ; chronyc tracking ; serveurs NTP internes ntp1.horizon.local et ntp2.horizon.local ; impact sur Kerberos, JWT et journaux d'audit"
+  - id: RB-036
+    title: Saturation du stockage des journaux (logs)
+    service: observabilite
+    facts: "Loki rétention 30 jours ; alerte à 85 % ; ne jamais supprimer les journaux d'audit (rétention 10 ans hors Loki) ; réduire le niveau de log debug"
+  - id: RB-037
+    title: Alertes Prometheus muettes (watchdog)
+    service: observabilite
+    facts: "l'alerte Watchdog doit toujours être active ; son absence = chaîne d'alerte cassée ; vérifier Alertmanager et le récepteur PagerDuty ; P1 pour l'observabilité"
+  - id: RB-038
+    title: Traces OpenTelemetry manquantes
+    service: observabilite
+    facts: "collecteur OTel en endpoint OTLP HTTP port 4318 (pas gRPC 4317 pour l'auto-instrumentation Python) ; vérifier l'annotation d'instrumentation du pod"
+  - id: RB-039
+    title: Accès refusé à la console d'administration Rancher
+    service: plateforme-kubernetes
+    facts: "authentification via annuaire LDAP ; groupe ldap devops = admin ; erreur 401 = mot de passe ou compte verrouillé (5 essais) ; pas de compte local partagé"
+  - id: RB-040
+    title: Compte de service compromis suspecté
+    service: plateforme-securite
+    facts: "révoquer immédiatement les jetons et secrets (vault lease revoke -prefix) ; isoler le workload par NetworkPolicy ; prévenir le CERT Horizon ; préserver les journaux"
+  - id: RB-041
+    title: Vulnérabilité critique (CVE) sur une image en production
+    service: plateforme-securite
+    facts: "CVSS >= 9 : correctif sous 72 h ; scan Trivy dans le pipeline ; reconstruire l'image sur l'image de base patchée ; dérogation possible seulement avec avis DSEC"
+  - id: RB-042
+    title: Pipeline GitLab CI bloqué
+    service: plateforme-cicd
+    facts: "runners Kubernetes taggés hz-k8s ; job en pending = pas de runner disponible ; vérifier le quota du namespace gitlab-runners ; relancer depuis l'interface, pas de contournement"
+  - id: RB-043
+    title: Registry d'images interne inaccessible
+    service: plateforme-cicd
+    facts: "registry.horizon.local (Harbor) ; erreur ImagePullBackOff en cascade ; vérifier le stockage du registry ; les nœuds gardent les images en cache"
+  - id: RB-044
+    title: Taux d'erreurs élevé sur l'application mobile
+    service: svc-mobile-bff
+    facts: "backend-for-frontend mobile ; erreurs côté client remontées par l'outil de crash reporting ; corréler avec l'identifiant de corrélation X-Correlation-Id ; seuil 3 % de sessions en erreur"
+  - id: RB-045
+    title: Base vectorielle Qdrant de l'assistant interne indisponible
+    service: plateforme-ia
+    facts: "assistant documentaire en mode dégradé : réponse « service indisponible » sans génération ; snapshot quotidien vers MinIO ; restauration par snapshot puis bascule d'alias"
+  - id: RB-046
+    title: Dépassement du budget de tokens de la plateforme IA
+    service: plateforme-ia
+    facts: "alerte à 70 % puis 100 % du budget mensuel par workspace ; à 100 %, refus des requêtes non critiques ; disjoncteur de coût ; ticket au propriétaire du workspace"
+  - id: RB-047
+    title: Panne réseau entre les deux datacenters
+    service: reseau
+    facts: "datacenters PAR1 et PAR2 ; liaison inter-DC ; risque de split-brain : ne jamais promouvoir deux primaires ; arbitre (witness) en PAR3 ; cellule de crise si > 15 min"
+  - id: RB-048
+    title: Plan de reprise d'activité (PRA) — bascule vers PAR2
+    service: continuite
+    facts: "décision de bascule par le directeur de crise uniquement ; RTO 4 h, RPO 15 min ; checklist PRA-02 ; exercice annuel obligatoire (exigence DORA)"
+  - id: RB-049
+    title: Fichier de virements de masse rejeté
+    service: svc-sepa
+    facts: "format pain.001 ; code HZ-SEPA-422 = schéma XML invalide ; rejeter le fichier entier, pas de correction manuelle ; renvoi au client entreprise via son conseiller"
+  - id: RB-050
+    title: Gestion d'un incident majeur — rôles et communication
+    service: continuite
+    facts: "incident P1 : responsable d'incident (IC), scribe, responsable communication ; point de situation toutes les 30 min ; communication externe validée par la Direction ; post-mortem sous 5 jours ouvrés"

@@ -1,0 +1,15 @@
+# Dépendances du module 1 uniquement : le minimum pour un RAG.
+# Chaque module a les siennes ; le module suivant part de celles-ci et en ajoute.
+[project]
+name = "module-01-fondamentaux"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=2.12",     # génération (Claude)
+    "fastembed>=0.9",      # embeddings locaux (ONNX, CPU)
+    "numpy>=1.26",         # « index » en mémoire
+    "python-dotenv>=1.0",  # lecture de .env hors Docker
+]
+
+[tool.uv]
+package = false            # un script, pas une bibliothèque

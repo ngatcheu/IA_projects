@@ -1,0 +1,35 @@
+# Golden set du Lab 1 (modules 1 et 2) : assistant d'astreinte.
+# Critère de réussite : au moins 8 questions sur 10 répondues SANS refus ET avec le bon
+# runbook parmi les sources citées. Les faits attendus viennent de corpus/topics.yaml.
+threshold: 8
+questions:
+  - question: Que faire quand un pod redémarre en boucle (CrashLoopBackOff) sur k8s-prod-par1 ?
+    expected: RB-001
+    must_contain: ["--previous"]
+  - question: À partir de combien de virements SEPA en attente doit-on ouvrir un P1 ?
+    expected: RB-005
+    must_contain: ["1 000"]
+  - question: Le taux de refus des autorisations carte dépasse 8 %, que faire côté HSM ?
+    expected: RB-006
+    must_contain: ["hsm-par2"]
+  - question: Comment desceller Vault et combien de clés faut-il ?
+    expected: RB-013
+    must_contain: ["3"]
+  - question: Quel est le seuil de lag Kafka sur paiements.out et comment le réduire ?
+    expected: RB-008
+    must_contain: ["50 000"]
+  - question: Comment faire un retour arrière d'une application déployée en GitOps ?
+    expected: RB-019
+    must_contain: ["revert"]
+  - question: Une image est refusée par Kyverno, quelle est la règle et que faire ?
+    expected: RB-020
+    must_contain: ["require-signed-images"]
+  - question: Le moteur anti-fraude est tombé, quel mode dégradé appliquer ?
+    expected: RB-033
+    must_contain: ["500"]
+  - question: Quel port utiliser pour envoyer les traces OpenTelemetry depuis une appli Python auto-instrumentée ?
+    expected: RB-038
+    must_contain: ["4318"]
+  - question: Qui décide de la bascule PRA vers PAR2 et quels sont le RTO et le RPO ?
+    expected: RB-048
+    must_contain: ["4 h"]

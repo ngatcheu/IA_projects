@@ -1,0 +1,18 @@
+# Module 1 : un seul conteneur, pas de base vectorielle (elle arrive au module 2).
+#
+#   docker compose build
+#   docker compose run --rm rag --passages "Que signifie le code HZ-SEPA-404 ?"
+services:
+  rag:
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        VERSION: ${TAG:-1.0.0}
+    # Tag = version du module (pyproject.toml). Surchargeable : TAG=1.0.1 docker compose build
+    image: ia-projects/module-01:${TAG:-1.0.0}
+    env_file:
+      - path: ../../.env          # clé API partagée par tous les modules (ignorée par Git)
+        required: false           # sans clé : --recherche-seule fonctionne
+    volumes:
+      - ./code:/module/code       # modifier le code sans reconstruire l'image

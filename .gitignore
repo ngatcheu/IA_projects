@@ -1,0 +1,16 @@
+# Secrets : la clé API Claude vit dans .env, jamais dans Git
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Données locales
+.qdrant/
+.cache/
+reports/
