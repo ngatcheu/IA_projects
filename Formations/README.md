@@ -22,7 +22,7 @@ La clé API est partagée : `IA_projects/.env` (ignoré par Git), lu par tous le
 
 | Module | Jour | Livrable | Lab | Statut |
 | --- | --- | --- | --- | --- |
-| [01 — Fondamentaux](module-01-fondamentaux/) | 1 | Prototype RAG minimal | 1 | en cours |
+| [01 — Fondamentaux](module-01-fondamentaux/) | 1 | Prototype RAG minimal | 1 | terminé |
 | [02 — Embeddings et bases vectorielles](module-02-embeddings-bases-vectorielles/) | 1 | Index interrogeable | 1 | en cours |
 | [03 — Ingestion : parsing, chunking, pipelines](module-03-ingestion-parsing-chunking/) | 1 | Pipeline d'ingestion incrémental | 2 | base posée |
 | [04 — Retrieval avancé](module-04-retrieval-avance/) | 2 | Recherche hybride + reranker | 3 | à faire |

@@ -32,6 +32,7 @@ HERE = Path(__file__).resolve().parent
 load_dotenv(find_dotenv(usecwd=True))
 
 MODEL = os.getenv("LLM_MODEL", "claude-opus-5-5")
+MIN_SCORE = 0.35 # en dessous, la question est hors du périmètre des runbooks
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 SYSTEM = (
@@ -108,6 +109,7 @@ def generate(system: str, prompt: str) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Prototype RAG minimal (module 1)")
+    parser.add_argument("--prompt", action="store_true", help="afficher le prompt sans appeler Claude")
     parser.add_argument("question")
     parser.add_argument("-k", type=int, default=3, help="nombre de passages (défaut : 3)")
     parser.add_argument("--passages", action="store_true", help="afficher les passages retrouvés")
@@ -122,11 +124,20 @@ def main() -> None:
     index = Index(load_passages(HERE / "docs"))
     hits = index.search(args.question, args.k)
 
+    if args.prompt:
+        print(SYSTEM, "\n\n", build_prompt(args.question, hits))
+        return
+    
     if args.passages or args.recherche_seule:
         print("Passages retrouvés :")
         for i, (p, score) in enumerate(hits, 1):
             print(f"  [{i}] {score:.2f}  {p.source} — {p.section}")
         print()
+
+    if hits[0][1] < MIN_SCORE:
+        print("Je n'ai pas cette information dans les runbooks.")
+        return
+    
     if not args.recherche_seule:
         print(generate(SYSTEM, build_prompt(args.question, hits)))
 

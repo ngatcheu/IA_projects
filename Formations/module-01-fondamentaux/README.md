@@ -1,6 +1,6 @@
 # Module 1 — Fondamentaux
 
-Partie A — RAG · jour 1 · 2 h · **statut : en cours**
+Partie A — RAG · jour 1 · 2 h · **statut : terminé**
 
 Premier maillon du fil rouge : un RAG minimal. Le module 2 part de ce code et le fait évoluer.
 
@@ -12,7 +12,8 @@ module-01-fondamentaux/
 ├── pyproject.toml       dépendances du module (+ uv.lock)
 └── code/
     ├── prototype.py     RAG minimal : ingestion en mémoire + requête + Claude
-    └── docs/            mini-corpus : 4 runbooks de la Banque Horizon
+    │                    (+ option --prompt et seuil de refus, exercices 3.6 et 3.7)
+    └── docs/            mini-corpus : 5 runbooks de la Banque Horizon (RB-035 : exercice 3.8)
 ```
 
 ## Objectifs
@@ -48,28 +49,34 @@ prise en compte sans reconstruire l'image.
 - [x] Ingestion : découpage par titres, embeddings, index en mémoire
 - [x] Requête : recherche top-k, prompt ancré, réponse citée
 - [x] Image Docker du module
-- [ ] Exercices du [cours](cours.md) : niveau 1 (comprendre), niveau 2 (choisir),
-  niveau 3 (pratiquer, dont 3 modifications de `prototype.py`)
+- [x] Exercices du [cours](cours.md) : niveau 1 (comprendre), niveau 2 (choisir),
+  niveau 3 (pratiquer, dont 3 modifications de `prototype.py`) — faits le 2026-11-25
 
 ## Ce que le module 2 fera évoluer
 
 - La matrice NumPy en mémoire devient une **base vectorielle Qdrant** (service ajouté au
   docker-compose), avec collection versionnée.
-- Comparaison de modèles d'embedding pour corriger l'échec de l'exercice 5.
+- Comparaison de modèles d'embedding pour corriger l'échec de l'exercice 3.5
+  (« redémarre en boucle »).
+- L'index n'étant plus recalculé à chaque lancement, ajouter un runbook demandera une
+  étape d'ingestion explicite (ce que l'exercice 3.8 n'avait pas besoin de faire).
 
 ## Notes et décisions
 
-Résultats du 2026-11-24 (image `ia-projects/module-01:1.0.0`, `claude-opus-5-5`,
+Résultats des 2026-11-24 et 25 (image `ia-projects/module-01:1.0.0`, `claude-opus-5-5`,
 embeddings `paraphrase-multilingual-MiniLM-L12-v2`) :
 
 | Exercice | Observation |
 | --- | --- |
-| 1. HZ-SEPA-404, RAG, k=3 | Les 3 passages viennent du bon runbook, mais la section **Résolution** (job `sepa-dispatch-retry`) n'est pas dedans (4ᵉ, score 0,51). Le modèle le dit honnêtement : « le contexte ne contient pas de procédure de résolution ». |
-| 1. HZ-SEPA-404, RAG, k=4 | Section Résolution récupérée : réponse complète et citée (signification, cut-off 15h30, `sepa-dispatch-retry`, P1 au-delà de 1 000). |
-| 1. HZ-SEPA-404, sans RAG | Le modèle reconnaît ne pas connaître ce code interne et ne fait que des hypothèses génériques, en le signalant : pas d'hallucination, mais pas de réponse utile. |
-| 2. Vault, k=1 et k=3 | Bonne réponse dans les deux cas (3 clés sur 5). Avec k=3, la règle « ne jamais copier une clé » est ajoutée [2]. |
-| 4. Livret A (hors corpus) | Refus propre : pas d'information dans le contexte, aucune invention de taux. Score du meilleur passage : 0,30. |
-| 5. « redémarre en boucle » | Échec du retrieval : RB-001 absent du top 3. Avec « CrashLoopBackOff » : RB-001 en tête (0,63). |
+| 3.1 HZ-SEPA-404, RAG, k=3 | Les 3 passages viennent du bon runbook, mais la section **Résolution** (job `sepa-dispatch-retry`) n'est pas dedans (4ᵉ, score 0,51). Le modèle le dit honnêtement : « le contexte ne contient pas de procédure de résolution ». |
+| 3.1 HZ-SEPA-404, RAG, k=4 | Section Résolution récupérée : réponse complète et citée (signification, cut-off 15h30, `sepa-dispatch-retry`, P1 au-delà de 1 000). |
+| 3.2 HZ-SEPA-404, sans RAG | Le modèle reconnaît ne pas connaître ce code interne et ne fait que des hypothèses génériques, en le signalant : pas d'hallucination, mais pas de réponse utile. |
+| 3.3 Vault, k=1 et k=3 | Bonne réponse dans les deux cas (3 clés sur 5). Avec k=3, la règle « ne jamais copier une clé » est ajoutée [2]. |
+| 3.4 Livret A (hors corpus) | Refus propre : pas d'information dans le contexte, aucune invention de taux. Score du meilleur passage : 0,30. |
+| 3.5 « redémarre en boucle » | Échec du retrieval : RB-001 absent du top 3 (0,36 à 0,44), alors que sa section Contexte contient ces mots. Avec « CrashLoopBackOff » : RB-001 occupe le top 3 (0,58 à 0,61). |
+| 3.6 option `--prompt` | Affiche consignes + passages numérotés + question, sans appel payant. Piège : bloc placé avant la recherche (`UnboundLocalError` sur `hits`) ou après `generate` (appel déjà payé). |
+| 3.7 seuil `MIN_SCORE = 0.35` | Livret A (0,30) refusé sans appel ; Vault (0,53) répond. Mais « redémarre en boucle » (0,44) passe le seuil alors que la recherche a raté. |
+| 3.8 ajout de RB-035 (NTP) | Retrouvé en tête (Diagnostic, 0,63), réponse « 500 ms » citée. Aucune reconstruction : `code/` est monté et l'index recalculé à chaque lancement. |
 
 Ce qu'on retient :
 
@@ -77,8 +84,12 @@ Ce qu'on retient :
   passer de k=3 à k=4 a changé une réponse incomplète en réponse complète.
 - Le découpage par section isole « Résolution » du reste du runbook : un chunk
   parent-document (module 3) ou un reranker (module 4) éviterait ce piège.
-- Le score du meilleur passage (0,30 pour le livret A, contre 0,53 à 0,70 pour les
-  bonnes questions) pourrait servir de **seuil de refus** avant même d'appeler le
-  modèle (module 5).
-- L'échec de l'exercice 5 motive le module 2 (meilleur modèle d'embedding) et le
-  module 4 (recherche hybride).
+- Le **seuil de refus** (0,35, fixé à l'œil) évite de payer pour les questions hors
+  sujet, mais ne détecte pas une recherche ratée sur une question couverte. C'est un
+  garde-fou de coût, pas une garantie de qualité ; il sera calibré sur un golden set
+  (module 6).
+- Un embedding n'est pas une recherche de mots : un petit modèle peut rater un passage
+  qui contient les mots exacts. L'échec de l'exercice 3.5 motive le module 2 (meilleur
+  modèle d'embedding) et le module 4 (recherche hybride avec BM25).
+- Le titre du runbook collé devant chaque passage rapproche tous les passages d'un même
+  document (scores serrés) : à reconsidérer au module 3 (chunking).
